@@ -42,12 +42,16 @@ public class OneTickFlickOverlay extends Overlay
 	private Color comboTextColor;
 	@Setter
 	private int swipeLineWidth;
-
+	@Setter
+	private OneTickFlickConfig.MovementStyle movementStyle;
+	@Setter
+	private boolean reverseDirection;
 
 	@Inject
 	OneTickFlickOverlay(OneTickFlickPlugin plugin, OneTickFlickConfig config)
 	{
 		this.plugin = plugin;
+		
 		greenStart = config.greenStart();
 		greenEnd = config.greenEnd();
 		showCombo = config.showCombo();
@@ -58,6 +62,8 @@ public class OneTickFlickOverlay extends Overlay
 		borderColor = config.borderColor();
 		comboTextColor = config.comboTextColor();
 		swipeLineWidth = config.swipeLineWidth();
+		movementStyle = config.movementStyle();
+		reverseDirection = config.reverseDirection();
 
 		setPosition(OverlayPosition.BOTTOM_LEFT);
 		setPreferredSize(DEFAULT_SIZE);
@@ -83,6 +89,50 @@ public class OneTickFlickOverlay extends Overlay
 	{
 		return visible;
 	}
+
+	/**
+	 * Calculates the swipe line position based on movement style
+	 */
+	private int calculateSwipeLinePosition(int width, int offset)
+	{
+		double intraTickProgress = (double) offset / TICK_LENGTH;
+		double progress = 0;
+
+		switch (movementStyle)
+		{
+			case LINEAR:
+				progress = intraTickProgress;
+				break;
+			case SINE:
+				progress = (1.0 - Math.cos(intraTickProgress * Math.PI)) / 2.0;
+				break;
+			case EASE_IN_OUT:
+				progress = intraTickProgress * intraTickProgress * (3 - 2 * intraTickProgress);
+				break;
+			case EASE_OUT_IN:
+				double fastSlowFastProgress = 0.5 * (1 - Math.cos(intraTickProgress * Math.PI));
+				progress = 0.5 * (Math.sin((fastSlowFastProgress * Math.PI) - (Math.PI / 2))) + 0.5;
+				break;
+			case PING_PONG:
+				double totalProgress = (plugin.getTickCount() % 2 + intraTickProgress) / 2.0;
+				progress = 1.0 - Math.abs(totalProgress * 2 - 1.0);
+				break;
+			default:
+				progress = intraTickProgress;
+				break;
+		}
+
+		int swipeLineX = (int) Math.round(progress * width);
+		
+		if (reverseDirection)
+		{
+			swipeLineX = width - swipeLineX;
+		}
+
+		return swipeLineX;
+	}
+
+
 
 	@Override
 	public Dimension render(Graphics2D g)
@@ -115,8 +165,9 @@ public class OneTickFlickOverlay extends Overlay
 		g.setColor(targetZoneColor);
 		g.fillRect(greenX1, 0, greenX2 - greenX1, barHeight);
 
+		// Enhanced swipe line with movement styles
 		long ms = plugin.millisSinceTick();
-		int swipeLineX = (int) (width * ms / (double) TICK_LENGTH);
+		int swipeLineX = calculateSwipeLinePosition(width, (int) ms);
 		swipeLineX = Math.min(swipeLineX, width - swipeLineWidth); // Ensure the swipe line does not go out of the bar
 
 		g.setColor(swipeLineColor);
@@ -130,7 +181,7 @@ public class OneTickFlickOverlay extends Overlay
 		int y2 = barHeight / 2 + X_SIZE;
 		for (int offset : clickOffsets)
 		{
-			int x = width * offset / TICK_LENGTH;
+			int x = calculateSwipeLinePosition(width, offset);
 			g.drawLine(x - X_SIZE, y1, x + X_SIZE, y2);
 			g.drawLine(x - X_SIZE, y2, x + X_SIZE, y1);
 		}

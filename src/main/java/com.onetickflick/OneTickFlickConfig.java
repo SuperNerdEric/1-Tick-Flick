@@ -7,6 +7,8 @@ import java.awt.*;
 @ConfigGroup("onetickflick")
 public interface OneTickFlickConfig extends Config
 {
+	enum MovementStyle { SINE, LINEAR, EASE_IN_OUT, EASE_OUT_IN, PING_PONG }
+
 	@ConfigItem(
 			keyName = "detectPrayerBookClicks",
 			name = "Detect prayer book clicks",
@@ -78,8 +80,24 @@ public interface OneTickFlickConfig extends Config
 		return 0;
 	}
 
+	@ConfigItem(
+			keyName = "movementStyle",
+			name = "Movement Style",
+			description = "The animation style of the tick bar.",
+			position = 6
+	)
+	default MovementStyle movementStyle() { return MovementStyle.SINE; }
+
+	@ConfigItem(
+			keyName = "reverseDirection",
+			name = "Reverse Direction",
+			description = "Reverses the direction of the tick bar.",
+			position = 7
+	)
+	default boolean reverseDirection() { return false; }
+
 	@ConfigSection(
-			position = 6,
+			position = 8,
 			name = "Overlay Timeout",
 			description = "Configure the overlay timeout settings"
 	)
@@ -110,7 +128,7 @@ public interface OneTickFlickConfig extends Config
 	}
 
 	@ConfigSection(
-			position = 7,
+			position = 9,
 			name = "Colors",
 			description = "Recolor the various elements of the overlay"
 	)

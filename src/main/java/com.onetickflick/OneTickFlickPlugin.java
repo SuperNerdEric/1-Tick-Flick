@@ -47,6 +47,7 @@ public class OneTickFlickPlugin extends Plugin
 
 	@Getter(AccessLevel.PACKAGE)
 	private int combo;
+	private int tickCount = 0;
 
 	@Override
 	protected void startUp()
@@ -54,6 +55,7 @@ public class OneTickFlickPlugin extends Plugin
 		lastTickTime = System.currentTimeMillis();
 		lastInteraction = lastTickTime;
 		combo = 0;
+		tickCount = 0;
 
 		overlay.setVisible(true);
 		overlayManager.add(overlay);
@@ -107,6 +109,12 @@ public class OneTickFlickPlugin extends Plugin
 			case "swipeLineWidth":
 				overlay.setSwipeLineWidth(config.swipeLineWidth());
 				break;
+			case "movementStyle":
+				overlay.setMovementStyle(config.movementStyle());
+				break;
+			case "reverseDirection":
+				overlay.setReverseDirection(config.reverseDirection());
+				break;
 		}
 	}
 
@@ -125,6 +133,7 @@ public class OneTickFlickPlugin extends Plugin
 		currentTickClicks.clear();
 		overlay.newTick();
 		lastTickTime = System.currentTimeMillis();
+		tickCount++;
 
 		if (!nextTickClicks.isEmpty())
 		{
@@ -197,6 +206,14 @@ public class OneTickFlickPlugin extends Plugin
 	long millisSinceTick()
 	{
 		return System.currentTimeMillis() - lastTickTime;
+	}
+
+	/**
+	 * Returns the current tick count for ping-pong animation.
+	 */
+	int getTickCount()
+	{
+		return tickCount;
 	}
 
 	/**
