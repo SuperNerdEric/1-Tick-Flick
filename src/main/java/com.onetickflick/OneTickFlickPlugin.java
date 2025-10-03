@@ -159,6 +159,7 @@ public class OneTickFlickPlugin extends Plugin
 
 		if (widget == null
 				|| (widget.getId() != InterfaceID.Orbs.PRAYERBUTTON
+				&& widget.getId() != InterfaceID.OrbsNomap.PRAYERBUTTON
 				&& !(config.detectPrayerBookClicks() && isPrayerBookWidget(widget.getId()))))
 		{
 			return;
