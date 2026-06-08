@@ -36,6 +36,8 @@ public class OneTickFlickPlugin extends Plugin
 	@Inject
 	private OneTickFlickOverlay overlay;
 	@Inject
+	private PrayerBarOverlay prayerBarOverlay;
+	@Inject
 	private OneTickFlickConfig config;
 	@Inject
 	private Client client;
@@ -56,13 +58,17 @@ public class OneTickFlickPlugin extends Plugin
 		combo = 0;
 
 		overlay.setVisible(true);
+		prayerBarOverlay.setVisible(true);
+		overlay.setShowOverlayPrayerBar(config.showOverlayPrayerBar());
 		overlayManager.add(overlay);
+		overlayManager.add(prayerBarOverlay);
 	}
 
 	@Override
 	protected void shutDown()
 	{
 		overlayManager.remove(overlay);
+		overlayManager.remove(prayerBarOverlay);
 		currentTickClicks.clear();
 		nextTickClicks.clear();
 	}
@@ -77,6 +83,9 @@ public class OneTickFlickPlugin extends Plugin
 
 		switch (event.getKey())
 		{
+			case "showOverlayPrayerBar":
+				overlay.setShowOverlayPrayerBar(config.showOverlayPrayerBar());
+				break;
 			case "greenStart":
 				overlay.setGreenStart(config.greenStart());
 				break;
@@ -85,6 +94,9 @@ public class OneTickFlickPlugin extends Plugin
 				break;
 			case "showCombo":
 				overlay.setShowCombo(config.showCombo());
+				break;
+			case "comboCounterText":
+				overlay.setComboCounterText(config.comboCounterText());
 				break;
 			case "targetZoneColor":
 				overlay.setTargetZoneColor(config.targetZoneColor());
@@ -107,6 +119,18 @@ public class OneTickFlickPlugin extends Plugin
 			case "swipeLineWidth":
 				overlay.setSwipeLineWidth(config.swipeLineWidth());
 				break;
+			case "prayerBarFillColor":
+				prayerBarOverlay.setBarFillColor(config.prayerBarFillColor());
+				break;
+			case "prayerBarBackgroundColor":
+				prayerBarOverlay.setBarBackgroundColor(config.prayerBarBackgroundColor());
+				break;
+			case "prayerBarSwipeLineColor":
+				prayerBarOverlay.setSwipeLineColor(config.prayerBarSwipeLineColor());
+				break;
+			case "prayerBarClickLineColor":
+				prayerBarOverlay.setClickLineColor(config.prayerBarClickLineColor());
+				break;
 		}
 	}
 
@@ -124,6 +148,8 @@ public class OneTickFlickPlugin extends Plugin
 
 		currentTickClicks.clear();
 		overlay.newTick();
+		prayerBarOverlay.newTick();
+		prayerBarOverlay.onTick();
 		lastTickTime = System.currentTimeMillis();
 
 		if (!nextTickClicks.isEmpty())
@@ -132,24 +158,12 @@ public class OneTickFlickPlugin extends Plugin
 			{
 				currentTickClicks.add(offset);
 				overlay.recordClick(offset);
+				prayerBarOverlay.recordClick(offset);
 			}
 			nextTickClicks.clear();
 		}
 
-		if (config.enableTimeout() && overlay.isVisible())
-		{
-			long elapsed = System.currentTimeMillis() - lastInteraction;
-			boolean timedOut = elapsed > config.overlayTimeoutSeconds() * 1000L;
-			boolean prayerActive = client.getServerVarbitValue(VarbitID.PRAYER_ALLACTIVE) != 0;
-
-			if (timedOut && (config.timeoutWhilePrayerActive() || !prayerActive)) {
-				overlay.setVisible(false);
-			}
-		}
-		else if (!config.enableTimeout() && !overlay.isVisible())
-		{
-			overlay.setVisible(true);
-		}
+		applyTimeoutVisibility();
 	}
 
 	@Subscribe
@@ -182,13 +196,46 @@ public class OneTickFlickPlugin extends Plugin
 		{
 			currentTickClicks.add(offset);
 			overlay.recordClick(offset);
+			prayerBarOverlay.recordClick(offset);
 		}
 
 		lastInteraction = System.currentTimeMillis();
-		if (!overlay.isVisible())
+		if (!overlay.isVisible() || !prayerBarOverlay.isVisible())
 		{
-			// No matter what the overlay timeout options are, we want to show the overlay when the player clicks the quick prayer orb
 			overlay.setVisible(true);
+			prayerBarOverlay.setVisible(true);
+		}
+	}
+
+	private void applyTimeoutVisibility()
+	{
+		if (config.enableTimeout())
+		{
+			if (!overlay.isVisible() && !prayerBarOverlay.isVisible())
+			{
+				return;
+			}
+
+			long elapsed = System.currentTimeMillis() - lastInteraction;
+			boolean timedOut = elapsed > config.overlayTimeoutSeconds() * 1000L;
+			boolean prayerActive = client.getServerVarbitValue(VarbitID.PRAYER_ALLACTIVE) != 0;
+
+			if (timedOut && (config.timeoutWhilePrayerActive() || !prayerActive))
+			{
+				overlay.setVisible(false);
+				prayerBarOverlay.setVisible(false);
+			}
+		}
+		else
+		{
+			if (!overlay.isVisible())
+			{
+				overlay.setVisible(true);
+			}
+			if (!prayerBarOverlay.isVisible())
+			{
+				prayerBarOverlay.setVisible(true);
+			}
 		}
 	}
 

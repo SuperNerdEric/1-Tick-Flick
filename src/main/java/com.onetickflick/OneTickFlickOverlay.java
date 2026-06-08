@@ -25,6 +25,7 @@ public class OneTickFlickOverlay extends Overlay
 	private final OneTickFlickPlugin plugin;
 	private final List<Integer> clickOffsets = new CopyOnWriteArrayList<>();
 	private volatile boolean visible = true;
+	private boolean showOverlayPrayerBar = true;
 
 	@Setter
 	private int greenStart;
@@ -44,6 +45,8 @@ public class OneTickFlickOverlay extends Overlay
 	@Setter
 	private Color comboTextColor;
 	@Setter
+	private String comboCounterText;
+	@Setter
 	private int swipeLineWidth;
 
 
@@ -54,12 +57,14 @@ public class OneTickFlickOverlay extends Overlay
 		greenStart = config.greenStart();
 		greenEnd = config.greenEnd();
 		showCombo = config.showCombo();
+		showOverlayPrayerBar = config.showOverlayPrayerBar();
 		targetZoneColor = config.targetZoneColor();
 		backgroundColor = config.backgroundColor();
 		clickColor = config.clickColor();
 		swipeLineColor = config.swipeLineColor();
 		borderColor = config.borderColor();
 		comboTextColor = config.comboTextColor();
+		comboCounterText = config.comboCounterText();
 		swipeLineWidth = config.swipeLineWidth();
 
 		setPosition(OverlayPosition.BOTTOM_LEFT);
@@ -94,10 +99,16 @@ public class OneTickFlickOverlay extends Overlay
 		setMinimumSize(getMinimumHeight());
 	}
 
+	void setShowOverlayPrayerBar(boolean showOverlayPrayerBar)
+	{
+		this.showOverlayPrayerBar = showOverlayPrayerBar;
+		setMinimumSize(getMinimumHeight());
+	}
+
 	@Override
 	public Dimension render(Graphics2D g)
 	{
-		if (!visible)
+		if (!visible || (!showOverlayPrayerBar && !showCombo))
 		{
 			return null;
 		}
@@ -105,7 +116,6 @@ public class OneTickFlickOverlay extends Overlay
 		Rectangle bounds = getBounds();
 		Dimension size = getPreferredSize() == null ? DEFAULT_SIZE : getPreferredSize();
 
-		int reservedSpace = getReservedSpace();
 		int width = size.width;
 		int height = size.height;
 		if (bounds != null && bounds.width > 0 && bounds.height > 0)
@@ -114,46 +124,61 @@ public class OneTickFlickOverlay extends Overlay
 			height = Math.max(bounds.height, getMinimumHeight());
 		}
 
-		int barHeight = Math.max(MIN_BAR_HEIGHT, height - reservedSpace);
-		int barY = showCombo ? 0 : (height - barHeight) / 2;
+		int barHeight = 0;
+		int barY = 0;
 
-		int greenX1 = width * greenStart / TICK_LENGTH;
-		int greenX2 = width * greenEnd / TICK_LENGTH;
-
-		g.setColor(backgroundColor);
-		g.fillRect(0, barY, greenX1, barHeight);
-		g.fillRect(greenX2, barY, width - greenX2, barHeight);
-
-		g.setColor(targetZoneColor);
-		g.fillRect(greenX1, barY, greenX2 - greenX1, barHeight);
-
-		long ms = plugin.millisSinceTick();
-		int swipeLineX = (int) (width * ms / (double) TICK_LENGTH);
-		swipeLineX = Math.min(swipeLineX, width - swipeLineWidth);
-
-		g.setColor(swipeLineColor);
-		g.fillRect(swipeLineX, barY, swipeLineWidth, barHeight);
-
-		g.setColor(borderColor);
-		g.drawRect(0, barY, width, barHeight);
-
-		g.setColor(clickColor);
-		int xSize = Math.min(X_SIZE, Math.max(1, (barHeight - 1) / 2));
-		int y1 = barY + barHeight / 2 - xSize;
-		int y2 = barY + barHeight / 2 + xSize;
-		for (int offset : clickOffsets)
+		if (showOverlayPrayerBar)
 		{
-			int x = width * offset / TICK_LENGTH;
-			g.drawLine(x - xSize, y1, x + xSize, y2);
-			g.drawLine(x - xSize, y2, x + xSize, y1);
+			int reservedSpace = getReservedSpace();
+			barHeight = Math.max(MIN_BAR_HEIGHT, height - reservedSpace);
+			barY = showCombo ? 0 : (height - barHeight) / 2;
+
+			int greenX1 = width * greenStart / TICK_LENGTH;
+			int greenX2 = width * greenEnd / TICK_LENGTH;
+
+			g.setColor(backgroundColor);
+			g.fillRect(0, barY, greenX1, barHeight);
+			g.fillRect(greenX2, barY, width - greenX2, barHeight);
+
+			g.setColor(targetZoneColor);
+			g.fillRect(greenX1, barY, greenX2 - greenX1, barHeight);
+
+			long ms = plugin.millisSinceTick();
+			int swipeLineX = (int) (width * ms / (double) TICK_LENGTH);
+			swipeLineX = Math.min(swipeLineX, width - swipeLineWidth);
+
+			g.setColor(swipeLineColor);
+			g.fillRect(swipeLineX, barY, swipeLineWidth, barHeight);
+
+			g.setColor(borderColor);
+			g.drawRect(0, barY, width, barHeight);
+
+			g.setColor(clickColor);
+			int xSize = Math.min(X_SIZE, Math.max(1, (barHeight - 1) / 2));
+			int y1 = barY + barHeight / 2 - xSize;
+			int y2 = barY + barHeight / 2 + xSize;
+			for (int offset : clickOffsets)
+			{
+				int x = width * offset / TICK_LENGTH;
+				g.drawLine(x - xSize, y1, x + xSize, y2);
+				g.drawLine(x - xSize, y2, x + xSize, y1);
+			}
 		}
 
 		if (showCombo)
 		{
 			g.setColor(comboTextColor);
-			String text = "Combo: " + plugin.getCombo();
+			String text = comboCounterText.replace("{combo}", String.valueOf(plugin.getCombo()));
 			int tx = (width - g.getFontMetrics().stringWidth(text)) / 2;
-			int ty = barY + barHeight + g.getFontMetrics().getAscent() + 2;
+			int ty;
+			if (showOverlayPrayerBar)
+			{
+				ty = barY + barHeight + g.getFontMetrics().getAscent() + 2;
+			}
+			else
+			{
+				ty = (height + g.getFontMetrics().getAscent()) / 2;
+			}
 			g.drawString(text, tx, ty);
 		}
 
@@ -162,11 +187,23 @@ public class OneTickFlickOverlay extends Overlay
 
 	private int getMinimumHeight()
 	{
-		return MIN_BAR_HEIGHT + getReservedSpace();
+		if (showOverlayPrayerBar)
+		{
+			return MIN_BAR_HEIGHT + getReservedSpace();
+		}
+		if (showCombo)
+		{
+			return COMBO_TEXT_SPACE;
+		}
+		return 0;
 	}
 
 	private int getReservedSpace()
 	{
+		if (!showOverlayPrayerBar)
+		{
+			return 0;
+		}
 		return showCombo ? COMBO_TEXT_SPACE : HIDDEN_COMBO_SPACE;
 	}
 }

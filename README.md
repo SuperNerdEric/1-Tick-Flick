@@ -15,11 +15,15 @@ If you don't care about this, you can set the start to 0ms and the end to 600ms.
 
 ## Config Options
 - Resizable overlay - Hold the `alt` key and drag the edges of the overlay
-- Enable/disable detection of prayer book clicks
-- Set the green bar start and end to adjust the target zone
-- Adjust the width of the swipe line
+- Enable/disable the overhead prayer bar - similar to the RuneLite "Prayer" plugin prayer bar
+- Enable/disable the overlay prayer bar
 - Enable/disable the combo counter
-- Set a timeout for the overlay to hide after a certain amount of time when not clicking prayers
-- Enable/disable timeout while prayers are active
+- Enable/disable detection of prayer book clicks
 - Set a click delay to account for latency or server delay
+- Set the green bar start and end to adjust the target zone in the overlay prayer bar
+- Adjust the width of the swipe line in the overlay prayer bar
+- Customize the combo counter text
+- Set a timeout for the overhead prayer bar / overlay to hide after a certain amount of time when not clicking prayers
+- Enable/disable timeout while prayers are active
+- Recolor all the overhead prayer bar elements
 - Recolor all the overlay elements
