@@ -163,18 +163,44 @@ public interface OneTickFlickConfig extends Config
 
 	@ConfigSection(
 			position = 7,
-			name = "Overhead Prayer Bar Colors",
-			description = "Recolor the various elements of the overhead prayer bar"
+			name = "Overhead Prayer Bar",
+			description = "Configure the size, shape and colors of the overhead prayer bar"
 	)
-	String overheadPrayerBarColorSection = "overheadPrayerBarColorSection";
+	String overheadPrayerBarSection = "overheadPrayerBarSection";
+
+	@Units(Units.PIXELS)
+	@ConfigItem(
+			keyName = "prayerBarWidth",
+			name = "Bar width",
+			description = "Width in pixels of the overhead prayer bar",
+			section = overheadPrayerBarSection,
+			position = 0
+	)
+	@Range(min = 10, max = 200)
+	default int prayerBarWidth()
+	{
+		return 30;
+	}
+
+	@ConfigItem(
+			keyName = "prayerBarRoundedCorners",
+			name = "Rounded corners",
+			description = "Whether the overhead prayer bar should have rounded corners",
+			section = overheadPrayerBarSection,
+			position = 1
+	)
+	default boolean prayerBarRoundedCorners()
+	{
+		return false;
+	}
 
 	@Alpha
 	@ConfigItem(
 			keyName = "prayerBarFillColor",
 			name = "Bar fill color",
 			description = "Color of the prayer points fill in the overhead prayer bar",
-			section = overheadPrayerBarColorSection,
-			position = 0
+			section = overheadPrayerBarSection,
+			position = 2
 	)
 	default Color prayerBarFillColor()
 	{
@@ -186,8 +212,8 @@ public interface OneTickFlickConfig extends Config
 			keyName = "prayerBarBackgroundColor",
 			name = "Bar background color",
 			description = "Color of the background in the overhead prayer bar",
-			section = overheadPrayerBarColorSection,
-			position = 1
+			section = overheadPrayerBarSection,
+			position = 3
 	)
 	default Color prayerBarBackgroundColor()
 	{
@@ -199,8 +225,8 @@ public interface OneTickFlickConfig extends Config
 			keyName = "prayerBarSwipeLineColor",
 			name = "Swipe line color",
 			description = "Color of the vertical line that swipes left to right each tick on the overhead prayer bar",
-			section = overheadPrayerBarColorSection,
-			position = 2
+			section = overheadPrayerBarSection,
+			position = 4
 	)
 	default Color prayerBarSwipeLineColor()
 	{
@@ -212,8 +238,8 @@ public interface OneTickFlickConfig extends Config
 			keyName = "prayerBarClickLineColor",
 			name = "Click line color",
 			description = "Color of the vertical lines on the overhead prayer bar that indicate when you clicked",
-			section = overheadPrayerBarColorSection,
-			position = 3
+			section = overheadPrayerBarSection,
+			position = 5
 	)
 	default Color prayerBarClickLineColor()
 	{
@@ -221,7 +247,7 @@ public interface OneTickFlickConfig extends Config
 	}
 
 	@ConfigSection(
-			position = 8,
+			position = 10,
 			name = "Overlay Colors",
 			description = "Recolor the various elements of the overlay"
 	)

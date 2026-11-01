@@ -25,5 +25,6 @@ If you don't care about this, you can set the start to 0ms and the end to 600ms.
 - Customize the combo counter text
 - Set a timeout for the overhead prayer bar / overlay to hide after a certain amount of time when not clicking prayers
 - Enable/disable timeout while prayers are active
+- Adjust the width of the overhead prayer bar and give it rounded corners
 - Recolor all the overhead prayer bar elements
 - Recolor all the overlay elements
