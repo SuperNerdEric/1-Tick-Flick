@@ -3,6 +3,9 @@ package com.onetickflick;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
+import java.awt.Shape;
+import java.awt.geom.Area;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import javax.inject.Inject;
@@ -20,7 +23,7 @@ import lombok.Setter;
 public class PrayerBarOverlay extends Overlay
 {
 	private static final int TICK_LENGTH = 600;
-	private static final Dimension PRAYER_BAR_SIZE = new Dimension(30, 5);
+	private static final int PRAYER_BAR_HEIGHT = 5;
 
 	private final Client client;
 	private final OneTickFlickConfig config;
@@ -74,10 +77,16 @@ public class PrayerBarOverlay extends Overlay
 
 		final float ratio = (float) client.getBoostedSkillLevel(Skill.PRAYER) / client.getRealSkillLevel(Skill.PRAYER);
 
-		final int barX = canvasPoint.getX() - 15;
+		final int barWidth = config.prayerBarWidth();
+		final int barHeight = PRAYER_BAR_HEIGHT;
+		final int barX = canvasPoint.getX() - barWidth / 2;
 		final int barY = canvasPoint.getY();
-		final int barWidth = PRAYER_BAR_SIZE.width;
-		final int barHeight = PRAYER_BAR_SIZE.height;
+
+		final Shape originalClip = graphics.getClip();
+		if (config.prayerBarRoundedCorners())
+		{
+			graphics.clip(roundedBarShape(barX, barY, barWidth, barHeight));
+		}
 
 		final int progressFill = (int) Math.ceil(Math.min((barWidth * ratio), barWidth));
 
@@ -100,7 +109,22 @@ public class PrayerBarOverlay extends Overlay
 			graphics.fillRect(x, barY, 1, barHeight);
 		}
 
+		graphics.setClip(originalClip);
+
 		return null;
+	}
+
+	/**
+	 * The bar's rectangle with the single pixel in each corner removed
+	 */
+	private static Shape roundedBarShape(int x, int y, int width, int height)
+	{
+		final Area area = new Area(new Rectangle(x, y, width, height));
+		area.subtract(new Area(new Rectangle(x, y, 1, 1)));
+		area.subtract(new Area(new Rectangle(x + width - 1, y, 1, 1)));
+		area.subtract(new Area(new Rectangle(x, y + height - 1, 1, 1)));
+		area.subtract(new Area(new Rectangle(x + width - 1, y + height - 1, 1, 1)));
+		return area;
 	}
 
 	void recordClick(int offset)
