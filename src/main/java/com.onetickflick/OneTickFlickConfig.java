@@ -121,6 +121,79 @@ public interface OneTickFlickConfig extends Config
 
 	@ConfigSection(
 			position = 6,
+			name = "Sips Saved",
+			description = "Show how many prayer restore sips (and GP) your 1-tick flicks have saved, in the overlay"
+	)
+	String sipsSavedSection = "sipsSavedSection";
+
+	@ConfigItem(
+			keyName = "restoreItem",
+			name = "Restore item",
+			section = sipsSavedSection,
+			position = 0,
+			description = "Which prayer restore item to convert saved prayer points into, for the sips and GP saved")
+	default RestoreItem restoreItem()
+	{
+		return RestoreItem.PRAYER_POTION;
+	}
+
+	@ConfigItem(
+			keyName = "showSessionSipsSaved",
+			name = "Show combo sips saved",
+			section = sipsSavedSection,
+			position = 1,
+			description = "Show the sips (or moths) of the chosen restore item saved during the current combo. Based on the drain rate of your active prayers, your prayer bonus and the restore amount of one sip at your prayer level (including the holy wrench / prayer cape bonus).")
+	default boolean showSessionSipsSaved()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "showSessionGpSaved",
+			name = "Show combo GP saved",
+			section = sipsSavedSection,
+			position = 2,
+			description = "Show the GP saved during the current combo, based on GE prices of the chosen restore item")
+	default boolean showSessionGpSaved()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "showLifetimeSipsSaved",
+			name = "Show lifetime sips saved",
+			section = sipsSavedSection,
+			position = 3,
+			description = "Show the total sips (or moths) of the chosen restore item saved on this account")
+	default boolean showLifetimeSipsSaved()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "showLifetimeGpSaved",
+			name = "Show lifetime GP saved",
+			section = sipsSavedSection,
+			position = 4,
+			description = "Show the total GP saved on this account, valued at current GE prices")
+	default boolean showLifetimeGpSaved()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "resetLifetimeSipsSaved",
+			name = "Reset lifetime totals",
+			section = sipsSavedSection,
+			position = 5,
+			description = "Tick to reset the lifetime sips and GP saved for the logged in account. You will be asked to confirm.")
+	default boolean resetLifetimeSipsSaved()
+	{
+		return false;
+	}
+
+	@ConfigSection(
+			position = 7,
 			name = "Timeout",
 			description = "Configure the timeout settings"
 	)
@@ -162,7 +235,7 @@ public interface OneTickFlickConfig extends Config
 	}
 
 	@ConfigSection(
-			position = 7,
+			position = 8,
 			name = "Overhead Prayer Bar",
 			description = "Configure the size, shape and colors of the overhead prayer bar"
 	)

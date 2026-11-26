@@ -3,19 +3,28 @@ package com.onetickflick;
 import com.google.inject.Provides;
 
 import javax.inject.Inject;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 
 import lombok.AccessLevel;
 import lombok.Getter;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
 import net.runelite.api.MenuAction;
+import net.runelite.api.Skill;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
@@ -38,9 +47,17 @@ public class OneTickFlickPlugin extends Plugin
 	@Inject
 	private PrayerBarOverlay prayerBarOverlay;
 	@Inject
+	private SipsSavedOverlay sipsSavedOverlay;
+	@Inject
 	private OneTickFlickConfig config;
 	@Inject
 	private Client client;
+	@Inject
+	private SipsSavedTracker sipsSavedTracker;
+	@Inject
+	private ConfigManager configManager;
+	@Inject
+	private ClientThread clientThread;
 
 	private long lastTickTime;
 	private long lastInteraction;
@@ -56,12 +73,23 @@ public class OneTickFlickPlugin extends Plugin
 		lastTickTime = System.currentTimeMillis();
 		lastInteraction = lastTickTime;
 		combo = 0;
+		sipsSavedTracker.load();
+		clientThread.invoke(() ->
+		{
+			if (client.getGameState() == GameState.LOGGED_IN)
+			{
+				sipsSavedTracker.refreshAll();
+			}
+			sipsSavedOverlay.refresh();
+		});
 
 		overlay.setVisible(true);
+		sipsSavedOverlay.setVisible(true);
 		prayerBarOverlay.setVisible(true);
 		overlay.setShowOverlayPrayerBar(config.showOverlayPrayerBar());
 		overlayManager.add(overlay);
 		overlayManager.add(prayerBarOverlay);
+		overlayManager.add(sipsSavedOverlay);
 	}
 
 	@Override
@@ -69,6 +97,9 @@ public class OneTickFlickPlugin extends Plugin
 	{
 		overlayManager.remove(overlay);
 		overlayManager.remove(prayerBarOverlay);
+		overlayManager.remove(sipsSavedOverlay);
+		sipsSavedTracker.endSession();
+		sipsSavedTracker.save();
 		currentTickClicks.clear();
 		nextTickClicks.clear();
 	}
@@ -115,9 +146,36 @@ public class OneTickFlickPlugin extends Plugin
 				break;
 			case "comboTextColor":
 				overlay.setComboTextColor(config.comboTextColor());
+				sipsSavedOverlay.setTextColor(config.comboTextColor());
 				break;
 			case "swipeLineWidth":
 				overlay.setSwipeLineWidth(config.swipeLineWidth());
+				break;
+			case "showSessionSipsSaved":
+				sipsSavedOverlay.setShowSessionSips(config.showSessionSipsSaved());
+				clientThread.invoke(sipsSavedOverlay::refresh);
+				break;
+			case "showSessionGpSaved":
+				sipsSavedOverlay.setShowSessionGp(config.showSessionGpSaved());
+				clientThread.invoke(sipsSavedOverlay::refresh);
+				break;
+			case "showLifetimeSipsSaved":
+				sipsSavedOverlay.setShowLifetimeSips(config.showLifetimeSipsSaved());
+				clientThread.invoke(sipsSavedOverlay::refresh);
+				break;
+			case "showLifetimeGpSaved":
+				sipsSavedOverlay.setShowLifetimeGp(config.showLifetimeGpSaved());
+				clientThread.invoke(sipsSavedOverlay::refresh);
+				break;
+			case "restoreItem":
+				sipsSavedOverlay.setRestoreItem(config.restoreItem());
+				clientThread.invoke(sipsSavedOverlay::refresh);
+				break;
+			case "resetLifetimeSipsSaved":
+				if (config.resetLifetimeSipsSaved())
+				{
+					SwingUtilities.invokeLater(this::confirmResetLifetime);
+				}
 				break;
 			case "prayerBarFillColor":
 				prayerBarOverlay.setBarFillColor(config.prayerBarFillColor());
@@ -140,9 +198,14 @@ public class OneTickFlickPlugin extends Plugin
 		if (currentTickClicks.size() == 2 && currentTickClicks.stream().allMatch(this::inGreenZone))
 		{
 			combo++;
+			sipsSavedTracker.recordFlickTick();
 		}
 		else
 		{
+			if (combo > 0)
+			{
+				sipsSavedTracker.endSession();
+			}
 			combo = 0;
 		}
 
@@ -164,6 +227,68 @@ public class OneTickFlickPlugin extends Plugin
 		}
 
 		applyTimeoutVisibility();
+		sipsSavedOverlay.refresh();
+	}
+
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged event)
+	{
+		int id = event.getContainerId();
+		if (id == SipsSavedTracker.INVENTORY_CONTAINER_ID || id == SipsSavedTracker.WORN_CONTAINER_ID)
+		{
+			sipsSavedTracker.onItemContainerChanged(id, event.getItemContainer());
+		}
+	}
+
+	@Subscribe
+	public void onStatChanged(StatChanged event)
+	{
+		if (event.getSkill() == Skill.PRAYER)
+		{
+			sipsSavedTracker.onPrayerLevelChanged(event.getLevel());
+		}
+	}
+
+	private void confirmResetLifetime()
+	{
+		// Untick the box straight away, so it acts like a button.
+		configManager.setConfiguration("onetickflick", "resetLifetimeSipsSaved", false);
+
+		int result = JOptionPane.showConfirmDialog(
+				client.getCanvas(),
+				"Reset lifetime sips and GP saved for this account?\nThis cannot be undone.",
+				"1 Tick Flick",
+				JOptionPane.YES_NO_OPTION,
+				JOptionPane.WARNING_MESSAGE);
+
+		if (result == JOptionPane.YES_OPTION)
+		{
+			clientThread.invoke(() ->
+			{
+				sipsSavedTracker.resetLifetime();
+				sipsSavedOverlay.refresh();
+			});
+		}
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		GameState state = event.getGameState();
+		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING)
+		{
+			combo = 0;
+			sipsSavedTracker.endSession();
+			sipsSavedTracker.save();
+		}
+	}
+
+	@Subscribe
+	public void onRuneScapeProfileChanged(RuneScapeProfileChanged event)
+	{
+		// Lifetime totals are stored per account, so reload them when the account changes.
+		sipsSavedTracker.load();
+		sipsSavedOverlay.refresh();
 	}
 
 	@Subscribe
@@ -203,6 +328,7 @@ public class OneTickFlickPlugin extends Plugin
 		if (!overlay.isVisible() || !prayerBarOverlay.isVisible())
 		{
 			overlay.setVisible(true);
+			sipsSavedOverlay.setVisible(true);
 			prayerBarOverlay.setVisible(true);
 		}
 	}
@@ -223,6 +349,7 @@ public class OneTickFlickPlugin extends Plugin
 			if (timedOut && (config.timeoutWhilePrayerActive() || !prayerActive))
 			{
 				overlay.setVisible(false);
+				sipsSavedOverlay.setVisible(false);
 				prayerBarOverlay.setVisible(false);
 			}
 		}
@@ -231,6 +358,7 @@ public class OneTickFlickPlugin extends Plugin
 			if (!overlay.isVisible())
 			{
 				overlay.setVisible(true);
+				sipsSavedOverlay.setVisible(true);
 			}
 			if (!prayerBarOverlay.isVisible())
 			{
