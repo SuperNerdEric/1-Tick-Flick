@@ -14,13 +14,16 @@ public class OneTickFlickOverlay extends Overlay
 	private static final int MIN_BAR_HEIGHT = 5;
 	private static final int HIDDEN_COMBO_SPACE = 6;
 	private static final int COMBO_TEXT_SPACE = 20;
+	private static final int HIGHEST_LINE_SPACE = 14;
+	private static final int MIN_TEXT_GAP = 8;
 	private static final int DEFAULT_BAR_HEIGHT = 12;
 	private static final int DEFAULT_TEXT_SPACE = 20;
 	private static final int X_SIZE = 4;
 	private static final int TICK_LENGTH = 600;
 	private static final int MIN_WIDTH = 50;
 	private static final int DEFAULT_WIDTH = 150;
-	private static final Dimension DEFAULT_SIZE = new Dimension(DEFAULT_WIDTH, DEFAULT_BAR_HEIGHT + DEFAULT_TEXT_SPACE);
+	// Default height includes room for a wrapped highest combo line, so wrapping doesn't squash the bar on a fresh install.
+	private static final Dimension DEFAULT_SIZE = new Dimension(DEFAULT_WIDTH, DEFAULT_BAR_HEIGHT + DEFAULT_TEXT_SPACE + HIGHEST_LINE_SPACE);
 
 	private final OneTickFlickPlugin plugin;
 	private final List<Integer> clickOffsets = new CopyOnWriteArrayList<>();
@@ -48,6 +51,21 @@ public class OneTickFlickOverlay extends Overlay
 	private String comboCounterText;
 	@Setter
 	private int swipeLineWidth;
+	private boolean showHighestCombo;
+	private String highestComboText;
+
+	// Highest combo layout cache. Only recalculated when one of its inputs changes, not every frame.
+	private int cachedHighest = -1;
+	private int cachedWidth = -1;
+	private Font cachedFont;
+	private String cachedComboTemplate;
+	private String cachedHighestTemplate;
+	private String cachedHighestString;
+	private int cachedHighestWidth;
+	/**
+	 * Whether the highest combo is drawn on its own line below the combo counter, because they don't fit side by side.
+	 */
+	private boolean wrapHighest;
 
 
 	@Inject
@@ -66,6 +84,8 @@ public class OneTickFlickOverlay extends Overlay
 		comboTextColor = config.comboTextColor();
 		comboCounterText = config.comboCounterText();
 		swipeLineWidth = config.swipeLineWidth();
+		showHighestCombo = config.showHighestCombo();
+		highestComboText = config.highestComboText();
 
 		setPosition(OverlayPosition.BOTTOM_LEFT);
 		setPreferredSize(DEFAULT_SIZE);
@@ -99,6 +119,16 @@ public class OneTickFlickOverlay extends Overlay
 		setMinimumSize(getMinimumHeight());
 	}
 
+	void setShowHighestCombo(boolean showHighestCombo)
+	{
+		this.showHighestCombo = showHighestCombo;
+	}
+
+	void setHighestComboText(String highestComboText)
+	{
+		this.highestComboText = highestComboText;
+	}
+
 	void setShowOverlayPrayerBar(boolean showOverlayPrayerBar)
 	{
 		this.showOverlayPrayerBar = showOverlayPrayerBar;
@@ -116,13 +146,15 @@ public class OneTickFlickOverlay extends Overlay
 		Rectangle bounds = getBounds();
 		Dimension size = getPreferredSize() == null ? DEFAULT_SIZE : getPreferredSize();
 
-		int width = size.width;
-		int height = size.height;
-		if (bounds != null && bounds.width > 0 && bounds.height > 0)
+		boolean hasBounds = bounds != null && bounds.width > 0 && bounds.height > 0;
+		int width = hasBounds ? Math.max(bounds.width, MIN_WIDTH) : size.width;
+
+		if (showCombo && showHighestCombo)
 		{
-			width = Math.max(bounds.width, MIN_WIDTH);
-			height = Math.max(bounds.height, getMinimumHeight());
+			updateHighestLayout(g.getFontMetrics(), width);
 		}
+
+		int height = hasBounds ? Math.max(bounds.height, getMinimumHeight()) : size.height;
 
 		int barHeight = 0;
 		int barY = 0;
@@ -169,7 +201,6 @@ public class OneTickFlickOverlay extends Overlay
 		{
 			g.setColor(comboTextColor);
 			String text = comboCounterText.replace("{combo}", String.valueOf(plugin.getCombo()));
-			int tx = (width - g.getFontMetrics().stringWidth(text)) / 2;
 			int ty;
 			if (showOverlayPrayerBar)
 			{
@@ -177,12 +208,67 @@ public class OneTickFlickOverlay extends Overlay
 			}
 			else
 			{
-				ty = (height + g.getFontMetrics().getAscent()) / 2;
+				ty = (height - HIGHEST_LINE_SPACE + g.getFontMetrics().getAscent()) / 2;
 			}
-			g.drawString(text, tx, ty);
+			if (showHighestCombo)
+			{
+				g.drawString(text, 0, ty);
+				if (wrapHighest)
+				{
+					// Not enough room side by side: highest combo on the line below, both left aligned.
+					g.drawString(cachedHighestString, 0, ty + HIGHEST_LINE_SPACE);
+				}
+				else
+				{
+					// Combo on the left, highest combo on the right of the same line.
+					g.drawString(cachedHighestString, width - cachedHighestWidth, ty);
+				}
+			}
+			else
+			{
+				int tx = (width - g.getFontMetrics().stringWidth(text)) / 2;
+				g.drawString(text, tx, ty);
+			}
 		}
 
 		return new Dimension(width, height);
+	}
+
+	/**
+	 * Works out the highest combo text and whether it fits beside the combo counter. The combo counter is measured
+	 * showing the highest value, since the current combo can never be larger, so the layout doesn't jump around as
+	 * the combo changes. Only recalculated when the highest combo, the texts, the width or the font change.
+	 */
+	private void updateHighestLayout(FontMetrics fm, int width)
+	{
+		int highest = plugin.getHighestCombo();
+		Font font = fm.getFont();
+		if (highest == cachedHighest && width == cachedWidth && font.equals(cachedFont)
+				&& comboCounterText == cachedComboTemplate && highestComboText == cachedHighestTemplate)
+		{
+			return;
+		}
+
+		cachedHighest = highest;
+		cachedWidth = width;
+		cachedFont = font;
+		cachedComboTemplate = comboCounterText;
+		cachedHighestTemplate = highestComboText;
+		cachedHighestString = highestComboText.replace("{highest}", String.valueOf(highest));
+		cachedHighestWidth = fm.stringWidth(cachedHighestString);
+
+		int widestCombo = fm.stringWidth(comboCounterText.replace("{combo}", String.valueOf(highest)));
+		boolean wrap = widestCombo + MIN_TEXT_GAP + cachedHighestWidth > width;
+		wrapHighest = wrap;
+	}
+
+	/**
+	 * Space below the bar for text. Always includes a second line for a wrapped highest combo, so the bar keeps the
+	 * same height whether or not the highest combo wraps.
+	 */
+	private int getComboTextSpace()
+	{
+		return COMBO_TEXT_SPACE + HIGHEST_LINE_SPACE;
 	}
 
 	private int getMinimumHeight()
@@ -193,7 +279,7 @@ public class OneTickFlickOverlay extends Overlay
 		}
 		if (showCombo)
 		{
-			return COMBO_TEXT_SPACE;
+			return getComboTextSpace();
 		}
 		return 0;
 	}
@@ -204,6 +290,6 @@ public class OneTickFlickOverlay extends Overlay
 		{
 			return 0;
 		}
-		return showCombo ? COMBO_TEXT_SPACE : HIDDEN_COMBO_SPACE;
+		return showCombo ? getComboTextSpace() : HIDDEN_COMBO_SPACE;
 	}
 }

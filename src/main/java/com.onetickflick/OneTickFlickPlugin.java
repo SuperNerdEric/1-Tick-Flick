@@ -7,7 +7,9 @@ import javax.inject.Inject;
 import lombok.AccessLevel;
 import lombok.Getter;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
 import net.runelite.api.MenuAction;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.gameval.InterfaceID;
@@ -16,6 +18,7 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
@@ -30,6 +33,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class OneTickFlickPlugin extends Plugin
 {
 	private static final int TICK_LENGTH = 600;
+	private static final String CONFIG_GROUP = "onetickflick";
+	private static final String HIGHEST_COMBO_KEY = "highestCombo";
 
 	@Inject
 	private OverlayManager overlayManager;
@@ -41,6 +46,8 @@ public class OneTickFlickPlugin extends Plugin
 	private OneTickFlickConfig config;
 	@Inject
 	private Client client;
+	@Inject
+	private ConfigManager configManager;
 
 	private long lastTickTime;
 	private long lastInteraction;
@@ -49,6 +56,12 @@ public class OneTickFlickPlugin extends Plugin
 
 	@Getter(AccessLevel.PACKAGE)
 	private int combo;
+	/**
+	 * Highest combo on the current account. Saved per RuneScape profile when a new record's combo ends.
+	 */
+	@Getter(AccessLevel.PACKAGE)
+	private int highestCombo;
+	private boolean highestComboDirty;
 
 	@Override
 	protected void startUp()
@@ -56,6 +69,7 @@ public class OneTickFlickPlugin extends Plugin
 		lastTickTime = System.currentTimeMillis();
 		lastInteraction = lastTickTime;
 		combo = 0;
+		loadHighestCombo();
 
 		overlay.setVisible(true);
 		prayerBarOverlay.setVisible(true);
@@ -69,6 +83,7 @@ public class OneTickFlickPlugin extends Plugin
 	{
 		overlayManager.remove(overlay);
 		overlayManager.remove(prayerBarOverlay);
+		saveHighestCombo();
 		currentTickClicks.clear();
 		nextTickClicks.clear();
 	}
@@ -97,6 +112,12 @@ public class OneTickFlickPlugin extends Plugin
 				break;
 			case "comboCounterText":
 				overlay.setComboCounterText(config.comboCounterText());
+				break;
+			case "showHighestCombo":
+				overlay.setShowHighestCombo(config.showHighestCombo());
+				break;
+			case "highestComboText":
+				overlay.setHighestComboText(config.highestComboText());
 				break;
 			case "targetZoneColor":
 				overlay.setTargetZoneColor(config.targetZoneColor());
@@ -140,9 +161,19 @@ public class OneTickFlickPlugin extends Plugin
 		if (currentTickClicks.size() == 2 && currentTickClicks.stream().allMatch(this::inGreenZone))
 		{
 			combo++;
+			if (combo > highestCombo)
+			{
+				highestCombo = combo;
+				highestComboDirty = true;
+			}
 		}
 		else
 		{
+			if (combo > 0)
+			{
+				// Only writes when this combo set a new record.
+				saveHighestCombo();
+			}
 			combo = 0;
 		}
 
@@ -164,6 +195,41 @@ public class OneTickFlickPlugin extends Plugin
 		}
 
 		applyTimeoutVisibility();
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		GameState state = event.getGameState();
+		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING)
+		{
+			combo = 0;
+			saveHighestCombo();
+		}
+	}
+
+	@Subscribe
+	public void onRuneScapeProfileChanged(RuneScapeProfileChanged event)
+	{
+		// The highest combo is stored per account, so reload it when the account changes.
+		loadHighestCombo();
+	}
+
+	private void loadHighestCombo()
+	{
+		Integer saved = configManager.getRSProfileConfiguration(CONFIG_GROUP, HIGHEST_COMBO_KEY, Integer.class);
+		highestCombo = saved == null ? 0 : saved;
+		highestComboDirty = false;
+	}
+
+	private void saveHighestCombo()
+	{
+		if (!highestComboDirty)
+		{
+			return;
+		}
+		configManager.setRSProfileConfiguration(CONFIG_GROUP, HIGHEST_COMBO_KEY, highestCombo);
+		highestComboDirty = false;
 	}
 
 	@Subscribe

@@ -119,6 +119,28 @@ public interface OneTickFlickConfig extends Config
 		return "Combo: {combo}";
 	}
 
+	@ConfigItem(
+			keyName = "showHighestCombo",
+			name = "Show highest combo",
+			section = overlaySection,
+			position = 4,
+			description = "Show your highest combo next to the combo counter: combo on the left, highest on the right. If they don't fit side by side, the highest combo moves to the line below. Saved per account.")
+	default boolean showHighestCombo()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "highestComboText",
+			name = "Highest combo text",
+			section = overlaySection,
+			position = 5,
+			description = "Text displayed for the highest combo. Use {highest} to insert your highest combo.")
+	default String highestComboText()
+	{
+		return "({highest})";
+	}
+
 	@ConfigSection(
 			position = 6,
 			name = "Timeout",
