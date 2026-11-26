@@ -101,12 +101,14 @@ class SipsSavedTracker
 
 	// Cached state, updated from events on the client thread.
 	private volatile int prayerLevel = 1;
+	private int prayerPoints;
 	private int prayerBonus;
 	private boolean inventoryRestoreBoost;
 	private boolean wornRestoreBoost;
 
 	/**
-	 * Last non-zero drain effect seen. Used when no prayer happens to be active at the moment the tick is processed.
+	 * Last non-zero drain effect seen during the current combo. Used when no prayer happens to be active at the
+	 * moment the tick is processed. Cleared when the combo ends so it can't carry over into a later combo.
 	 */
 	private int lastDrainEffect;
 	private boolean dirty;
@@ -126,13 +128,15 @@ class SipsSavedTracker
 	void refreshAll()
 	{
 		prayerLevel = Math.max(1, client.getRealSkillLevel(Skill.PRAYER));
+		prayerPoints = client.getBoostedSkillLevel(Skill.PRAYER);
 		onItemContainerChanged(INVENTORY_CONTAINER_ID, client.getItemContainer(INVENTORY_CONTAINER_ID));
 		onItemContainerChanged(WORN_CONTAINER_ID, client.getItemContainer(WORN_CONTAINER_ID));
 	}
 
-	void onPrayerLevelChanged(int realLevel)
+	void onPrayerChanged(int realLevel, int currentPoints)
 	{
 		prayerLevel = Math.max(1, realLevel);
+		prayerPoints = currentPoints;
 	}
 
 	void onItemContainerChanged(int containerId, ItemContainer container)
@@ -153,6 +157,12 @@ class SipsSavedTracker
 	 */
 	void recordFlickTick()
 	{
+		// With no prayer points, prayers can't be turned on, so nothing is being saved.
+		if (prayerPoints <= 0)
+		{
+			return;
+		}
+
 		int drainEffect = getActiveDrainEffect();
 		if (drainEffect > 0)
 		{
@@ -182,6 +192,7 @@ class SipsSavedTracker
 	void endSession()
 	{
 		sessionPoints = 0;
+		lastDrainEffect = 0;
 		if (dirty && client.getTickCount() - lastSaveTick >= SAVE_INTERVAL_TICKS)
 		{
 			save();

@@ -245,7 +245,7 @@ public class OneTickFlickPlugin extends Plugin
 	{
 		if (event.getSkill() == Skill.PRAYER)
 		{
-			sipsSavedTracker.onPrayerLevelChanged(event.getLevel());
+			sipsSavedTracker.onPrayerChanged(event.getLevel(), event.getBoostedLevel());
 		}
 	}
 
